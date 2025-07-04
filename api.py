@@ -5,7 +5,7 @@
 import os
 from typing import Any, Dict, Optional, TypedDict, Tuple, List, cast
 
-from flask import Flask, request
+from flask import Flask, request, Request
 from flask_socketio import SocketIO
 import logging
 
@@ -45,12 +45,15 @@ class _CompletionResponse(TypedDict):
 # Estrutura mínima da resposta do OpenAI que usamos
 
 
-class _OAChoiceMessage(TypedDict):
+class _OAMessage(TypedDict):
+    role: str
     content: str
 
 
 class _OAChoice(TypedDict):
-    message: _OAChoiceMessage
+    index: int
+    message: _OAMessage
+    finish_reason: str
 
 
 # Estatísticas de uso
@@ -69,6 +72,7 @@ class _OAChatResponse(TypedDict):
     model: str
     choices: List[_OAChoice]
     usage: _OAUsage
+    system_fingerprint: str
 
 
 # ---------------------------------------------
@@ -220,7 +224,8 @@ def run_crew_process(sid: str, user_prompt: str, project_dir: str) -> None:
 
 @socketio.on('connect')
 def handle_connect() -> None:
-    sid: str = request.sid  # type: ignore[attr-defined]
+    req: Request = request  # type: ignore[assignment]
+    sid: str = cast(str, getattr(req, "sid", ""))
     print(f"Cliente conectado: {sid}")
 
 @socketio.on('start_crew')
@@ -229,12 +234,14 @@ def handle_start_crew(data: Dict[str, Any]) -> None:
     project_dir = data.get('project_dir', '.')
     
     # Inicia o processo da equipe em uma thread de fundo para não bloquear o servidor
-    sid: str = request.sid  # type: ignore[attr-defined]
+    req: Request = request  # type: ignore[assignment]
+    sid: str = cast(str, getattr(req, "sid", ""))
     socketio.start_background_task(run_crew_process, sid, user_prompt, project_dir)
 
 @socketio.on('disconnect')
 def handle_disconnect() -> None:
-    sid: str = request.sid  # type: ignore[attr-defined]
+    req: Request = request  # type: ignore[assignment]
+    sid: str = cast(str, getattr(req, "sid", ""))
     print(f"Cliente desconectado: {sid}")
 
 if __name__ == '__main__':
