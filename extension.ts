@@ -47,6 +47,14 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showErrorMessage(`Auto Coder – falha na conexão: ${err.message}`);
         });
 
+        socket.io.on('reconnect_attempt', (attempt: number) => {
+            statusBarItem.text = `$(sync~spin) Auto Coder: Reconectando (${attempt})`;
+        });
+
+        socket.io.on('reconnect_failed', () => {
+            statusBarItem.text = '$(error) Auto Coder: Reconexão falhou';
+        });
+
         socket.on('connect', () => {
             statusBarItem.text = '$(robot) Auto Coder: Online';
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: 'Conectado ao servidor de agentes! O que vamos construir hoje?' });
@@ -101,7 +109,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
 
                 // Envia para o backend (ou outro endpoint) o prefixo e obtém sugestão
-                const response = await fetch(`${serverUrl}/inline_completion`, {
+                const response = await fetchWithRetry(`${serverUrl}/inline_completion`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -141,6 +149,26 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.languages.registerInlineCompletionItemProvider({ pattern: '**' }, inlineProvider)
     );
+
+    // --- Utilitários ---
+    async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                const res = await fetch(url, options);
+                if (res.ok) {
+                    return res;
+                }
+            } catch (err) {
+                if (attempt === retries) {
+                    throw err;
+                }
+            }
+            // Espera incremental (exponencial simples)
+            await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        }
+        // Nunca deve chegar aqui
+        throw new Error('Unexpected fetchWithRetry failure');
+    }
 }
 
 function getWebviewContent(): string {

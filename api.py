@@ -1,13 +1,46 @@
+# ----------------------------------------------------
+# Imports e Tipagem
+# ----------------------------------------------------
+
 import os
+from typing import Any, Dict, Optional, TypedDict, Tuple
+
 from flask import Flask, request
 from flask_socketio import SocketIO
+import logging
+
 from gerador_de_agentes import CrewGenerator
 from crewai import Task, Crew
+
+# Tentativa de import da OpenAI com fallback
+try:
+    import openai
+    from openai.error import OpenAIError  # type: ignore
+except ImportError:  # pragma: no cover – execução sem openai instalada
+    openai = None  # type: ignore
+
+    class OpenAIError(Exception):
+        """Fallback genérico caso o pacote openai não esteja presente."""
+
+        pass
 
 app = Flask(__name__)
 # Chave secreta para a sessão do Flask, necessária para o SocketIO
 app.config['SECRET_KEY'] = 'secret!very-secret-key' 
-socketio = SocketIO(app, cors_allowed_origins="*")
+# O parâmetro async_mode='threading' evita dependências adicionais
+socketio: SocketIO = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+# Logger local para erros
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------
+# Typing helpers para a resposta do endpoint
+# ---------------------------------------------
+
+
+class _CompletionResponse(TypedDict):
+    completion: str
+
 
 # ---------------------------------------------
 # Endpoint REST para auto-complete em linha
@@ -15,65 +48,63 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 
 @app.post('/inline_completion')
-def inline_completion():
-    """Gera uma sugestão de código simples baseada no prefixo enviado.
+def inline_completion() -> Tuple[_CompletionResponse, int]:  # noqa: D401
+    """Retorna continuação de código a partir de um _prefix_."""
 
-    Este endpoint é utilizado pela extensão do VS Code para oferecer
-    sugestões estilo GitHub Copilot. Por padrão, utiliza a API OpenAI
-    se a variável de ambiente OPENAI_API_KEY estiver definida.
-    Caso contrário, retorna uma string vazia.
-    """
+    data: Dict[str, Any] = request.get_json(force=True)
+    prefix: str = str(data.get('prefix', ''))
+    language: str = str(data.get('language', 'python'))
+
+    # Validações rápidas para evitar custo de API
+    if len(prefix.strip()) < 3 or openai is None:
+        return {"completion": ""}, 200
+
+    api_key: Optional[str] = os.getenv('OPENAI_API_KEY') or str(data.get('api_key', '')) or None
+
+    if not api_key:
+        # Sem chave configurada – retorno vazio ao invés de erro 500
+        return {"completion": ""}, 200
+
+    # Configura chave (seguro mesmo em multi-thread pois openai usa thread-local)
+    openai.api_key = api_key  # type: ignore[attr-defined]
+
     try:
-        data = request.get_json(force=True)
-        prefix: str = data.get('prefix', '')  # type: ignore[arg-type]
-        language: str = data.get('language', 'python')  # type: ignore[arg-type]
-
-        # Se estiver vazio ou muito curto, evita chamadas desnecessárias
-        if len(prefix.strip()) < 3:
-            return {"completion": ""}, 200
-
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            # Chave não configurada, retorna vazio para evitar falhas
-            return {"completion": ""}, 200
-
-        import openai  # import local para não exigir a lib em todos os ambientes
-
-        openai.api_key = api_key
-
-        # Solicita continuação concisa do código
-        response = openai.ChatCompletion.create(  # type: ignore[attr-defined]
+        response: Any = openai.ChatCompletion.create(  # type: ignore[attr-defined]
             model="gpt-3.5-turbo-1106",
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are an expert {language} coding assistant. "
+                        f"You are an expert {language} coding assistant. "
                         "Continue the user's code snippet only with the next logical tokens. "
                         "Do NOT add any commentary or markdown formatting."
-                    ).format(language=language),
+                    ),
                 },
                 {"role": "user", "content": prefix},
             ],
             max_tokens=64,
-            temperature=0.2,
-            n=1,
-            stop=None,
+            temperature=0.1,
         )
 
-        completion = response.choices[0].message["content"].lstrip("\n")
-        return {"completion": completion}, 200
+        # Minimiza dependência de atributos complexos
+        choice: Any = response.choices[0]
+        content: str = getattr(choice.message, "content", "")  # type: ignore[attr-defined]
+        return {"completion": content.lstrip("\n")}, 200
 
-    except Exception:
-        # Em caso de erro, evita travar a extensão
+    except OpenAIError as exc:  # type: ignore[misc]
+        # Erro conhecido da OpenAI – registra e devolve vazio
+        logger.error("OpenAI error: %s", exc)
+        return {"completion": ""}, 200
+    except Exception as exc:  # pragma: no cover – falha inesperada
+        logger.exception("Unexpected error when calling OpenAI: %s", exc)
         return {"completion": ""}, 200
 
 MAX_DEBUG_ATTEMPTS = 3
 
-def run_crew_process(sid, user_prompt, project_dir):
+def run_crew_process(sid: str, user_prompt: str, project_dir: str) -> None:
     """Esta função contém a lógica principal da equipe e emite logs via WebSocket."""
     
-    def log(message):
+    def log(message: str) -> None:
         """Função auxiliar para emitir logs para um cliente específico."""
         socketio.emit('log_message', {'data': message}, room=sid)  # type: ignore[arg-type]
         # Pequena pausa para garantir que a mensagem seja enviada
