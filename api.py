@@ -53,8 +53,22 @@ class _OAChoice(TypedDict):
     message: _OAChoiceMessage
 
 
-class _OAResponse(TypedDict):
+# Estatísticas de uso
+
+
+class _OAUsage(TypedDict):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+
+
+class _OAChatResponse(TypedDict):
+    id: str
+    object: str
+    created: int
+    model: str
     choices: List[_OAChoice]
+    usage: _OAUsage
 
 
 # ---------------------------------------------
@@ -102,7 +116,7 @@ def inline_completion() -> Tuple[_CompletionResponse, int]:  # noqa: D401
         )
 
         # Faz cast para TypedDict para ajuda do mypy
-        response: _OAResponse = cast(_OAResponse, response_raw)
+        response: _OAChatResponse = cast(_OAChatResponse, response_raw)
 
         if not response["choices"]:
             return {"completion": ""}, 200
