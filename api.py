@@ -175,20 +175,23 @@ def run_crew_process(sid: str, user_prompt: str, project_dir: str) -> None:
         socketio.emit('crew_finished', {'status': 'error', 'result': str(e)}, room=sid)  # type: ignore[arg-type]
 
 @socketio.on('connect')
-def handle_connect():
-    print(f"Cliente conectado: {request.sid}")
+def handle_connect() -> None:
+    sid: str = request.sid  # type: ignore[attr-defined]
+    print(f"Cliente conectado: {sid}")
 
 @socketio.on('start_crew')
-def handle_start_crew(data):
+def handle_start_crew(data: Dict[str, Any]) -> None:
     user_prompt = data.get('prompt', '')
     project_dir = data.get('project_dir', '.')
     
     # Inicia o processo da equipe em uma thread de fundo para não bloquear o servidor
-    socketio.start_background_task(run_crew_process, request.sid, user_prompt, project_dir)
+    sid: str = request.sid  # type: ignore[attr-defined]
+    socketio.start_background_task(run_crew_process, sid, user_prompt, project_dir)
 
 @socketio.on('disconnect')
-def handle_disconnect():
-    print(f"Cliente desconectado: {request.sid}")
+def handle_disconnect() -> None:
+    sid: str = request.sid  # type: ignore[attr-defined]
+    print(f"Cliente desconectado: {sid}")
 
 if __name__ == '__main__':
     # O `debug=True` do Flask não é compatível com o modo de produção do SocketIO
