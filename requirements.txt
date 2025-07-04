@@ -6,3 +6,4 @@ Flask-SocketIO
 crewai_tools
 pytest
 openai
+typing_extensions

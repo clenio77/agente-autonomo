@@ -4,6 +4,7 @@
 
 import os
 from typing import Any, Dict, Optional, TypedDict, Tuple, List, cast
+from typing_extensions import NotRequired
 
 from flask import Flask, request, Request
 from flask_socketio import SocketIO
@@ -45,15 +46,25 @@ class _CompletionResponse(TypedDict):
 # Estrutura mínima da resposta do OpenAI que usamos
 
 
+class _OAToolCall(TypedDict, total=False):
+    id: str
+    type: str
+    function: Dict[str, Any]
+
+
 class _OAMessage(TypedDict):
     role: str
     content: str
+    name: NotRequired[str]
+    function_call: NotRequired[Dict[str, Any]]
+    tool_calls: NotRequired[List[_OAToolCall]]
 
 
 class _OAChoice(TypedDict):
     index: int
     message: _OAMessage
     finish_reason: str
+    logprobs: NotRequired[Any]
 
 
 # Estatísticas de uso
