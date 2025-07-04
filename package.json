@@ -1,13 +1,39 @@
 {
   "name": "autocoder-extension",
-  "version": "0.0.1",
+  "displayName": "Auto Coder",
+  "description": "Equipe de IA para desenvolvimento de software diretamente no VS Code",
+  "version": "0.0.2",
+  "publisher": "seu-username",
   "engines": {
     "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:autocoder.startChat"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "autocoder.startChat",
+        "title": "Auto Coder: Start Chat"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "pretest": "npm run compile",
+    "package": "vsce package"
   },
   "dependencies": {
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0"
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^20.2.3",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1",
+    "vsce": "^3.15.0"
   }
 }

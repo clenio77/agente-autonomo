@@ -43,9 +43,43 @@ def run_crew_process(sid, user_prompt, project_dir):
 
         # (A lógica de parsing de nome de arquivo e as fases 2, 3, 4 permanecem as mesmas)
         # ...
+        # --- Fase 2: Desenvolvimento ---
+        log("Fase 2: O Desenvolvedor está implementando o código conforme o plano...")
+        developer_task = Task(
+            description=f"""Implemente as alterações e/ou novos arquivos descritos no seguinte plano:\n\n{plan_result}\n\nGaranta que o código esteja organizado, bem documentado e siga as melhores práticas de Python.""",
+            expected_output="Código implementado ou modificado conforme o plano.",
+            agent=agents["developer"]
+        )
+        developer_crew = Crew(agents=[agents["developer"]], tasks=[developer_task])
+        dev_result = developer_crew.kickoff()
+        log(f"Resultado do desenvolvimento: {dev_result}")
+
+        # --- Fase 3: QA ---
+        log("Fase 3: O Engenheiro de QA está escrevendo e executando testes...")
+        qa_task = Task(
+            description=f"""Com base no plano a seguir e no código atual do projeto, escreva testes unitários com pytest para validar a nova funcionalidade e execute-os.\n\nPlano:\n{plan_result}\n\nSe os testes falharem, descreva as falhas.""",
+            expected_output="Todos os testes passaram ou foram listadas as falhas encontradas.",
+            agent=agents["qa"]
+        )
+        qa_crew = Crew(agents=[agents["qa"]], tasks=[qa_task])
+        qa_result = qa_crew.kickoff()
+        log(f"Resultado do QA: {qa_result}")
+
+        # --- Fase 4: Refatoração ---
+        log("Fase 4: O Especialista em Refatoração está melhorando o código...")
+        refactor_task = Task(
+            description=f"""Analise o código atualizado no projeto e refatore-o para melhorar clareza, eficiência e aderência às boas práticas de Python. Não altere a lógica de negócios.""",
+            expected_output="Código refatorado e otimizado.",
+            agent=agents["refactorer"]
+        )
+        refactor_crew = Crew(agents=[agents["refactorer"]], tasks=[refactor_task])
+        refactor_result = refactor_crew.kickoff()
+        log(f"Resultado da refatoração: {refactor_result}")
+
+        final_result = f"{plan_result}\n\n----\n{dev_result}\n\n----\n{qa_result}\n\n----\n{refactor_result}"
 
         log("PROJETO CONCLUÍDO COM SUCESSO!")
-        socketio.emit('crew_finished', {'status': 'success', 'result': plan_result}, room=sid)
+        socketio.emit('crew_finished', {'status': 'success', 'result': final_result}, room=sid)
 
     except Exception as e:
         log(f"ERRO: {str(e)}")
