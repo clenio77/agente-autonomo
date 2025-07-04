@@ -3,7 +3,7 @@
 # ----------------------------------------------------
 
 import os
-from typing import Any, Dict, Optional, TypedDict, Tuple
+from typing import Any, Dict, Optional, TypedDict, Tuple, List, cast
 
 from flask import Flask, request
 from flask_socketio import SocketIO
@@ -42,6 +42,21 @@ class _CompletionResponse(TypedDict):
     completion: str
 
 
+# Estrutura mínima da resposta do OpenAI que usamos
+
+
+class _OAChoiceMessage(TypedDict):
+    content: str
+
+
+class _OAChoice(TypedDict):
+    message: _OAChoiceMessage
+
+
+class _OAResponse(TypedDict):
+    choices: List[_OAChoice]
+
+
 # ---------------------------------------------
 # Endpoint REST para auto-complete em linha
 # ---------------------------------------------
@@ -69,7 +84,7 @@ def inline_completion() -> Tuple[_CompletionResponse, int]:  # noqa: D401
     openai.api_key = api_key  # type: ignore[attr-defined]
 
     try:
-        response: Any = openai.ChatCompletion.create(  # type: ignore[attr-defined]
+        response_raw: Any = openai.ChatCompletion.create(  # type: ignore[attr-defined]
             model="gpt-3.5-turbo-1106",
             messages=[
                 {
@@ -86,14 +101,29 @@ def inline_completion() -> Tuple[_CompletionResponse, int]:  # noqa: D401
             temperature=0.1,
         )
 
-        # Minimiza dependência de atributos complexos
-        choice: Any = response.choices[0]
-        content: str = getattr(choice.message, "content", "")  # type: ignore[attr-defined]
+        # Faz cast para TypedDict para ajuda do mypy
+        response: _OAResponse = cast(_OAResponse, response_raw)
+
+        if not response["choices"]:
+            return {"completion": ""}, 200
+
+        content: str = response["choices"][0]["message"].get("content", "")
         return {"completion": content.lstrip("\n")}, 200
 
+    except (openai.error.Timeout, openai.error.APIConnectionError) as exc:  # type: ignore[attr-defined]
+        logger.warning("OpenAI network error: %s", exc)
+        return {"completion": ""}, 200
+    except openai.error.RateLimitError as exc:  # type: ignore[attr-defined]
+        logger.warning("OpenAI rate limit reached: %s", exc)
+        return {"completion": ""}, 200
+    except openai.error.AuthenticationError as exc:  # type: ignore[attr-defined]
+        logger.error("OpenAI authentication failed: %s", exc)
+        return {"completion": ""}, 200
+    except openai.error.InvalidRequestError as exc:  # type: ignore[attr-defined]
+        logger.error("OpenAI invalid request: %s", exc)
+        return {"completion": ""}, 200
     except OpenAIError as exc:  # type: ignore[misc]
-        # Erro conhecido da OpenAI – registra e devolve vazio
-        logger.error("OpenAI error: %s", exc)
+        logger.error("General OpenAI error: %s", exc)
         return {"completion": ""}, 200
     except Exception as exc:  # pragma: no cover – falha inesperada
         logger.exception("Unexpected error when calling OpenAI: %s", exc)

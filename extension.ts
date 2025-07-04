@@ -120,6 +120,16 @@ export function activate(context: vscode.ExtensionContext) {
                 });
 
                 if (!response.ok) {
+                    let humanMsg = `Auto Coder – erro ${response.status}`;
+                    if (response.status === 401) {
+                        humanMsg = 'Auto Coder – chave API inválida ou ausente.';
+                    } else if (response.status === 429) {
+                        humanMsg = 'Auto Coder – limite de requisições excedido (rate-limit).';
+                    } else if (response.status >= 500) {
+                        humanMsg = 'Auto Coder – erro interno no servidor.';
+                    }
+                    vscode.window.showWarningMessage(humanMsg);
+                    statusBarItem.text = '$(error) Auto Coder';
                     return { items: [] };
                 }
 
@@ -140,7 +150,8 @@ export function activate(context: vscode.ExtensionContext) {
                     ]
                 };
             } catch (err) {
-                // Em caso de erro, apenas não retorna sugestões
+                vscode.window.showErrorMessage(`Auto Coder – falha ao obter sugestão: ${String(err)}`);
+                statusBarItem.text = '$(error) Auto Coder';
                 return { items: [] };
             }
         }
