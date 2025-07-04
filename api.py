@@ -1,7 +1,6 @@
 import os
-import time
 from flask import Flask, request
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 from gerador_de_agentes import CrewGenerator
 from crewai import Task, Crew
 
@@ -17,7 +16,7 @@ def run_crew_process(sid, user_prompt, project_dir):
     
     def log(message):
         """Função auxiliar para emitir logs para um cliente específico."""
-        socketio.emit('log_message', {'data': message}, room=sid)
+        socketio.emit('log_message', {'data': message}, room=sid)  # type: ignore[arg-type]
         # Pequena pausa para garantir que a mensagem seja enviada
         socketio.sleep(0.1) 
 
@@ -68,7 +67,7 @@ def run_crew_process(sid, user_prompt, project_dir):
         # --- Fase 4: Refatoração ---
         log("Fase 4: O Especialista em Refatoração está melhorando o código...")
         refactor_task = Task(
-            description=f"""Analise o código atualizado no projeto e refatore-o para melhorar clareza, eficiência e aderência às boas práticas de Python. Não altere a lógica de negócios.""",
+            description="""Analise o código atualizado no projeto e refatore-o para melhorar clareza, eficiência e aderência às boas práticas de Python. Não altere a lógica de negócios.""",
             expected_output="Código refatorado e otimizado.",
             agent=agents["refactorer"]
         )
@@ -79,11 +78,11 @@ def run_crew_process(sid, user_prompt, project_dir):
         final_result = f"{plan_result}\n\n----\n{dev_result}\n\n----\n{qa_result}\n\n----\n{refactor_result}"
 
         log("PROJETO CONCLUÍDO COM SUCESSO!")
-        socketio.emit('crew_finished', {'status': 'success', 'result': final_result}, room=sid)
+        socketio.emit('crew_finished', {'status': 'success', 'result': final_result}, room=sid)  # type: ignore[arg-type]
 
     except Exception as e:
         log(f"ERRO: {str(e)}")
-        socketio.emit('crew_finished', {'status': 'error', 'result': str(e)}, room=sid)
+        socketio.emit('crew_finished', {'status': 'error', 'result': str(e)}, room=sid)  # type: ignore[arg-type]
 
 @socketio.on('connect')
 def handle_connect():

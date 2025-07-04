@@ -5,3 +5,4 @@ openai-whisper
 Flask-SocketIO
 crewai_tools
 pytest
+openai
