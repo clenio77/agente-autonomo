@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Ambiente Virtual
+venv/
+
+# Dependências do Node
+node_modules/
+
+# Arquivos de Ambiente (Contém segredos!)
+.env
+
+# Diretório de projetos gerados pela IA
+generated_projects/
+
+# Arquivos específicos do VSCode
+.vscode/
+
+# Arquivos de Log
+*.log

@@ -1,0 +1,13 @@
+{
+  "name": "autocoder-extension",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.2"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0"
+  }
+}
