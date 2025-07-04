@@ -42,7 +42,7 @@ def inline_completion():
         openai.api_key = api_key
 
         # Solicita continuação concisa do código
-        response = openai.ChatCompletion.create(
+        response = openai.ChatCompletion.create(  # type: ignore[attr-defined]
             model="gpt-3.5-turbo-1106",
             messages=[
                 {
@@ -77,7 +77,7 @@ def run_crew_process(sid, user_prompt, project_dir):
         """Função auxiliar para emitir logs para um cliente específico."""
         socketio.emit('log_message', {'data': message}, room=sid)  # type: ignore[arg-type]
         # Pequena pausa para garantir que a mensagem seja enviada
-        socketio.sleep(0.1) 
+        socketio.sleep(0.1)  # type: ignore[attr-defined]
 
     try:
         log(f"Iniciando equipe no diretório: {os.path.abspath(project_dir)}")

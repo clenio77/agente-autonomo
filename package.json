@@ -18,7 +18,22 @@
         "command": "autocoder.startChat",
         "title": "Auto Coder: Start Chat"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Auto Coder",
+      "properties": {
+        "autocoder.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:5001",
+          "description": "URL do servidor backend do Auto Coder."
+        },
+        "autocoder.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Chave de API para o provedor LLM (enviada ao backend opcionalmente)."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p .",

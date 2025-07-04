@@ -38,9 +38,12 @@ exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const socket_io_client_1 = require("socket.io-client");
 function activate(context) {
+    // Configurações do usuário
+    const cfg = vscode.workspace.getConfiguration('autocoder');
+    const serverUrl = cfg.get('serverUrl', 'http://127.0.0.1:5001');
     // Cria um item na Status Bar para abrir o chat rapidamente
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.text = '$(robot) Auto Coder';
+    statusBarItem.text = '$(robot) Auto Coder: $(sync~spin) Conectando';
     statusBarItem.command = 'autocoder.startChat';
     statusBarItem.tooltip = 'Abrir chat do Auto Coder';
     statusBarItem.show();
@@ -60,8 +63,16 @@ function activate(context) {
         });
         panel.webview.html = getWebviewContent();
         // Conectar ao servidor WebSocket
-        const socket = (0, socket_io_client_1.io)('http://127.0.0.1:5001');
+        const socket = (0, socket_io_client_1.io)(serverUrl, {
+            reconnectionAttempts: 3,
+            timeout: 5000,
+        });
+        socket.on('connect_error', (err) => {
+            statusBarItem.text = '$(error) Auto Coder: Offline';
+            vscode.window.showErrorMessage(`Auto Coder – falha na conexão: ${err.message}`);
+        });
         socket.on('connect', () => {
+            statusBarItem.text = '$(robot) Auto Coder: Online';
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: 'Conectado ao servidor de agentes! O que vamos construir hoje?' });
         });
         socket.on('log_message', (message) => {
@@ -73,6 +84,8 @@ function activate(context) {
         });
         socket.on('disconnect', () => {
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: 'Desconectado do servidor de agentes.' });
+            socket.disconnect();
+            statusBarItem.text = '$(debug-disconnect) Auto Coder: Desconectado';
         });
         panel.webview.onDidReceiveMessage(message => {
             if (message.command === 'sendMessage') {
@@ -86,6 +99,7 @@ function activate(context) {
         // Garantir que o socket seja desconectado quando o painel for fechado
         panel.onDidDispose(() => {
             socket.disconnect();
+            statusBarItem.text = '$(debug-disconnect) Auto Coder: Desconectado';
         }, null, context.subscriptions);
     });
     context.subscriptions.push(disposable);
@@ -99,7 +113,7 @@ function activate(context) {
                     return { items: [] };
                 }
                 // Envia para o backend (ou outro endpoint) o prefixo e obtém sugestão
-                const response = await fetch('http://127.0.0.1:5001/inline_completion', {
+                const response = await fetch(`${serverUrl}/inline_completion`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
