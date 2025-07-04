@@ -84,6 +84,7 @@ class _OAChatResponse(TypedDict):
     choices: List[_OAChoice]
     usage: _OAUsage
     system_fingerprint: str
+    prompt_filter_results: NotRequired[Any]
 
 
 # ---------------------------------------------
@@ -112,6 +113,18 @@ def inline_completion() -> Tuple[_CompletionResponse, int]:  # noqa: D401
     # Configura chave (seguro mesmo em multi-thread pois openai usa thread-local)
     openai.api_key = api_key  # type: ignore[attr-defined]
 
+    # ----------------- Catálogo de classes de erro OpenAI (compat v0/v1) --------
+    _err_mod = getattr(openai, "error", None)  # type: ignore[attr-defined]
+
+    TimeoutErr = getattr(_err_mod, "Timeout", OpenAIError)
+    ConnErr = getattr(_err_mod, "APIConnectionError", OpenAIError)
+    ServiceUnavailableErr = getattr(_err_mod, "ServiceUnavailableError", OpenAIError)
+    PermissionDeniedErr = getattr(_err_mod, "PermissionDeniedError", OpenAIError)
+    RateLimitErr = getattr(_err_mod, "RateLimitError", OpenAIError)
+    AuthErr = getattr(_err_mod, "AuthenticationError", OpenAIError)
+    BadRequestErr = getattr(_err_mod, "BadRequestError", getattr(_err_mod, "InvalidRequestError", OpenAIError))
+    APIErr = getattr(_err_mod, "APIError", OpenAIError)
+
     try:
         response_raw: Any = openai.ChatCompletion.create(  # type: ignore[attr-defined]
             model="gpt-3.5-turbo-1106",
@@ -139,17 +152,23 @@ def inline_completion() -> Tuple[_CompletionResponse, int]:  # noqa: D401
         content: str = response["choices"][0]["message"].get("content", "")
         return {"completion": content.lstrip("\n")}, 200
 
-    except (openai.error.Timeout, openai.error.APIConnectionError) as exc:  # type: ignore[attr-defined]
-        logger.warning("OpenAI network error: %s", exc)
+    except (TimeoutErr, ConnErr, ServiceUnavailableErr) as exc:  # network
+        logger.warning("OpenAI network/service error (%s): %s", exc.__class__.__name__, exc)
         return {"completion": ""}, 200
-    except openai.error.RateLimitError as exc:  # type: ignore[attr-defined]
+    except RateLimitErr as exc:
         logger.warning("OpenAI rate limit reached: %s", exc)
         return {"completion": ""}, 200
-    except openai.error.AuthenticationError as exc:  # type: ignore[attr-defined]
+    except AuthErr as exc:
         logger.error("OpenAI authentication failed: %s", exc)
         return {"completion": ""}, 200
-    except openai.error.InvalidRequestError as exc:  # type: ignore[attr-defined]
-        logger.error("OpenAI invalid request: %s", exc)
+    except PermissionDeniedErr as exc:
+        logger.error("OpenAI permission denied: %s", exc)
+        return {"completion": ""}, 200
+    except BadRequestErr as exc:  # includes InvalidRequestError
+        logger.error("OpenAI bad/invalid request: %s", exc)
+        return {"completion": ""}, 200
+    except APIErr as exc:
+        logger.error("OpenAI API error: %s", exc)
         return {"completion": ""}, 200
     except OpenAIError as exc:  # type: ignore[misc]
         logger.error("General OpenAI error: %s", exc)
