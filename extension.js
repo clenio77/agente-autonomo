@@ -1,7 +1,43 @@
-import * as vscode from 'vscode';
-import { io, Socket } from 'socket.io-client';
-
-export function activate(context: vscode.ExtensionContext) {
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.activate = activate;
+exports.deactivate = deactivate;
+const vscode = __importStar(require("vscode"));
+const socket_io_client_1 = require("socket.io-client");
+function activate(context) {
     // Cria um item na Status Bar para abrir o chat rapidamente
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.text = '$(robot) Auto Coder';
@@ -9,7 +45,6 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem.tooltip = 'Abrir chat do Auto Coder';
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
-
     // Comando principal para abrir o chat
     let disposable = vscode.commands.registerCommand('autocoder.startChat', () => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -18,64 +53,44 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
         const projectDir = workspaceFolders[0].uri.fsPath;
-
-        const panel = vscode.window.createWebviewPanel(
-            'autoCoderChat',
-            'Auto Coder Chat',
-            vscode.ViewColumn.One,
-            {
-                enableScripts: true,
-                // Manter o conteúdo do webview vivo mesmo quando não está visível
-                retainContextWhenHidden: true 
-            }
-        );
-
+        const panel = vscode.window.createWebviewPanel('autoCoderChat', 'Auto Coder Chat', vscode.ViewColumn.One, {
+            enableScripts: true,
+            // Manter o conteúdo do webview vivo mesmo quando não está visível
+            retainContextWhenHidden: true
+        });
         panel.webview.html = getWebviewContent();
-
         // Conectar ao servidor WebSocket
-        const socket = io('http://127.0.0.1:5001');
-
+        const socket = (0, socket_io_client_1.io)('http://127.0.0.1:5001');
         socket.on('connect', () => {
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: 'Conectado ao servidor de agentes! O que vamos construir hoje?' });
         });
-
         socket.on('log_message', (message) => {
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: message.data });
         });
-
         socket.on('crew_finished', (message) => {
             const finalText = `**PROCESSO CONCLUÍDO**\n\n**Status:** ${message.status}\n\n**Resultado Final:**\n---\n${message.result}`;
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: finalText });
         });
-
         socket.on('disconnect', () => {
             panel.webview.postMessage({ command: 'addMessage', role: 'agent', text: 'Desconectado do servidor de agentes.' });
         });
-
-        panel.webview.onDidReceiveMessage(
-            message => {
-                if (message.command === 'sendMessage') {
-                    panel.webview.postMessage({ command: 'addMessage', role: 'user', text: message.text });
-                    socket.emit('start_crew', { 
-                        prompt: message.text, 
-                        project_dir: projectDir 
-                    });
-                }
-            },
-            undefined,
-            context.subscriptions
-        );
-
+        panel.webview.onDidReceiveMessage(message => {
+            if (message.command === 'sendMessage') {
+                panel.webview.postMessage({ command: 'addMessage', role: 'user', text: message.text });
+                socket.emit('start_crew', {
+                    prompt: message.text,
+                    project_dir: projectDir
+                });
+            }
+        }, undefined, context.subscriptions);
         // Garantir que o socket seja desconectado quando o painel for fechado
         panel.onDidDispose(() => {
             socket.disconnect();
         }, null, context.subscriptions);
     });
-
     context.subscriptions.push(disposable);
-
     // --- Inline Completion Provider (estilo GitHub Copilot) ---
-    const inlineProvider: vscode.InlineCompletionItemProvider = {
+    const inlineProvider = {
         async provideInlineCompletionItems(document, position) {
             try {
                 const linePrefix = document.lineAt(position).text.substring(0, position.character);
@@ -83,7 +98,6 @@ export function activate(context: vscode.ExtensionContext) {
                 if (linePrefix.trim().length === 0) {
                     return { items: [] };
                 }
-
                 // Envia para o backend (ou outro endpoint) o prefixo e obtém sugestão
                 const response = await fetch('http://127.0.0.1:5001/inline_completion', {
                     method: 'POST',
@@ -94,18 +108,14 @@ export function activate(context: vscode.ExtensionContext) {
                         filePath: document.uri.fsPath
                     })
                 });
-
                 if (!response.ok) {
                     return { items: [] };
                 }
-
                 const data = await response.json();
-                const suggestion: string | undefined = data.completion;
-
+                const suggestion = data.completion;
                 if (!suggestion) {
                     return { items: [] };
                 }
-
                 const range = new vscode.Range(position, position);
                 return {
                     items: [
@@ -115,19 +125,16 @@ export function activate(context: vscode.ExtensionContext) {
                         }
                     ]
                 };
-            } catch (err) {
+            }
+            catch (err) {
                 // Em caso de erro, apenas não retorna sugestões
                 return { items: [] };
             }
         }
     };
-
-    context.subscriptions.push(
-        vscode.languages.registerInlineCompletionItemProvider({ pattern: '**' }, inlineProvider)
-    );
+    context.subscriptions.push(vscode.languages.registerInlineCompletionItemProvider({ pattern: '**' }, inlineProvider));
 }
-
-function getWebviewContent(): string {
+function getWebviewContent() {
     // O HTML e CSS permanecem os mesmos
     return `<!DOCTYPE html>
     <html lang="en">
@@ -182,5 +189,5 @@ function getWebviewContent(): string {
     </body>
     </html>`;
 }
-
-export function deactivate() {}
+function deactivate() { }
+//# sourceMappingURL=extension.js.map

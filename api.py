@@ -9,6 +9,65 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!very-secret-key' 
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# ---------------------------------------------
+# Endpoint REST para auto-complete em linha
+# ---------------------------------------------
+
+
+@app.post('/inline_completion')
+def inline_completion():
+    """Gera uma sugestão de código simples baseada no prefixo enviado.
+
+    Este endpoint é utilizado pela extensão do VS Code para oferecer
+    sugestões estilo GitHub Copilot. Por padrão, utiliza a API OpenAI
+    se a variável de ambiente OPENAI_API_KEY estiver definida.
+    Caso contrário, retorna uma string vazia.
+    """
+    try:
+        data = request.get_json(force=True)
+        prefix: str = data.get('prefix', '')  # type: ignore[arg-type]
+        language: str = data.get('language', 'python')  # type: ignore[arg-type]
+
+        # Se estiver vazio ou muito curto, evita chamadas desnecessárias
+        if len(prefix.strip()) < 3:
+            return {"completion": ""}, 200
+
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            # Chave não configurada, retorna vazio para evitar falhas
+            return {"completion": ""}, 200
+
+        import openai  # import local para não exigir a lib em todos os ambientes
+
+        openai.api_key = api_key
+
+        # Solicita continuação concisa do código
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-1106",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert {language} coding assistant. "
+                        "Continue the user's code snippet only with the next logical tokens. "
+                        "Do NOT add any commentary or markdown formatting."
+                    ).format(language=language),
+                },
+                {"role": "user", "content": prefix},
+            ],
+            max_tokens=64,
+            temperature=0.2,
+            n=1,
+            stop=None,
+        )
+
+        completion = response.choices[0].message["content"].lstrip("\n")
+        return {"completion": completion}, 200
+
+    except Exception:
+        # Em caso de erro, evita travar a extensão
+        return {"completion": ""}, 200
+
 MAX_DEBUG_ATTEMPTS = 3
 
 def run_crew_process(sid, user_prompt, project_dir):
