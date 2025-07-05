@@ -108,6 +108,20 @@ O sistema é dividido em duas partes principais: a extensão do VS Code (fronten
     - Abra a paleta de comandos (`Ctrl+Shift+P`).
     - Execute o comando `Auto Coder: Start Chat`.
     - Envie suas instruções para a equipe de agentes!
+    - O Auto-Coder também oferece **sugestões em linha** (inline completions), semelhantes ao GitHub Copilot. Enquanto você digita, aguarde por um texto transparente que pode ser aceito pressionando `Tab`.
+
+> Dica: há um ícone de robô na barra de status (`🤖 Auto Coder`). Clique nele para abrir a janela de chat a qualquer momento.
+
+#### Construir pacote `.vsix`
+
+Caso queira distribuir a extensão, basta executar:
+
+```bash
+npm run compile   # garante a build
+npx vsce package  # gera o arquivo autocoder-extension-*.vsix
+```
+
+Depois, no VS Code, use `Extensões → ... → Instalar do VSIX`.
 
 ---
 
